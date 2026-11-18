@@ -537,9 +537,13 @@ function save(){ try{ localStorage.setItem(KEY,JSON.stringify(S)); }catch(e){} p
 let _shT=null, _shLast='';
 function pushShared(){
   if(!LV.on||!LV.admin) return;
-  const body={kept:S.kept, ovr:S.ovr, ep:S.ep};
+  const body={ovr:S.ovr, ep:S.ep};
   const js=JSON.stringify(body); if(js===_shLast) return;
   clearTimeout(_shT); _shT=setTimeout(()=>{ _shLast=js; dbWrite('shared/state',()=>LV.db.doc('shared/state').set(Object.assign({},body,{updatedAt:Date.now()}))); },500);
+}
+function setKept(ids,on){ // anyone may star
+  ids.forEach(id=>{ const has=S.kept.includes(id); if(on&&!has) S.kept=S.kept.concat(id); if(!on&&has) S.kept=S.kept.filter(x=>x!==id); if(LV.on&&LV.db&&LV.db.keep) dbWrite('k/'+id,()=>LV.db.keep(id,on)); });
+  try{ localStorage.setItem(KEY,JSON.stringify(S)); }catch(e){}
 }
 function canShared(){ if(LV.on&&!LV.admin){ toast('Seul l\'animateur peut modifier cet élément : il est partagé avec tous'); return false; } return true; }
 
@@ -719,9 +723,8 @@ function renderRanks(){
   });
 }
 document.querySelector('.fams').addEventListener('click',e=>{
-  const b=e.target.closest('.pick'); if(!b) return; const id=+b.dataset.id; if(!canShared()) return;
-  S.kept = S.kept.includes(id) ? S.kept.filter(x=>x!==id) : S.kept.concat(id);
-  save(); renderRanks(); renderDecision();
+  const b=e.target.closest('.pick'); if(!b) return; const id=+b.dataset.id;
+  setKept([id], !S.kept.includes(id)); renderRanks(); renderDecision();
   const fam=V[id].fam, n=S.kept.filter(i=>V[i].fam===fam).length, tg=fam==='vu'?2:4; toast(`${FAM[fam]} : ${n} / ${tg} retenus${n>tg?' (au-delà de l\'objectif)':''}`);
 });
 document.getElementById('btn-copy-rank').onclick=()=>{
@@ -784,7 +787,7 @@ function renderDecision(){
       if(!x){ const sg=sugg[k-kept.length];
         html+=`<div class="slot"><div class="sh"><span>Choix ${k+1}</span></div><div class="ghost">${GHOST}<span>À désigner (étoile dans le classement)</span>${sg?`<button class="btn" data-keep="${sg.v.id}">Proposé : ${esc(sg.v.brand+' '+sg.v.model)} · ${Math.round(sg.s)}</button>`:''}</div></div>`; continue; }
       const v=x.v, r=rk.findIndex(y=>y.v.id===v.id)+1;
-      html+=`<div class="slot full ${k>=n?'extra':''}"><div class="sh"><span>Choix ${k+1}${k>=n?' · en plus':''}</span><span style="color:var(--coral)">rang ${r}</span></div><img class="p" src="${IMG[v.img]}" alt="${esc(v.brand+' '+v.model)}"><div class="mline">${logoImg(v.brand)}<div class="sm"><span style="color:var(--mute);font-size:11px;text-transform:uppercase;font-weight:800;display:block;letter-spacing:.04em">${esc(v.brand)}</span>${esc(v.model)}</div></div><div class="tags">${tagsHTML(v)}</div><div style="color:var(--ink-2);font-size:13px">${esc(v.version)}</div><div class="row" style="margin-top:auto;justify-content:space-between"><div><b class="num" style="font-size:26px;font-weight:900">${Math.round(x.s)}</b><span style="color:var(--mute);font-weight:700"> /100</span></div>${pickHTML(v,true)}</div></div>`;
+      html+=`<div class="slot full ${k>=n?'extra':''}"><div class="sh"><span>Choix ${k+1}${k>=n?' · en plus':''}</span><span style="color:var(--coral)">rang ${r}${LV.keptBy&&LV.keptBy[v.id]?' · par '+esc(LV.keptBy[v.id]):''}</span></div><img class="p" src="${IMG[v.img]}" alt="${esc(v.brand+' '+v.model)}"><div class="mline">${logoImg(v.brand)}<div class="sm"><span style="color:var(--mute);font-size:11px;text-transform:uppercase;font-weight:800;display:block;letter-spacing:.04em">${esc(v.brand)}</span>${esc(v.model)}</div></div><div class="tags">${tagsHTML(v)}</div><div style="color:var(--ink-2);font-size:13px">${esc(v.version)}</div><div class="row" style="margin-top:auto;justify-content:space-between"><div><b class="num" style="font-size:26px;font-weight:900">${Math.round(x.s)}</b><span style="color:var(--mute);font-weight:700"> /100</span></div>${pickHTML(v,true)}</div></div>`;
     }
     html+='</div></div>';
   });
@@ -797,18 +800,19 @@ function renderDecision(){
   const nO=Object.keys(S.ovr).length; if(nO) cr+=`\nNotes corrigées en séance : ${nO}\n`;
 }
 document.getElementById('slots').addEventListener('click',e=>{
-  const b=e.target.closest('[data-fill],[data-clear],[data-keep],[data-unkeep]'); if(!b||!canShared()) return;
+  const pk=e.target.closest('.pick'); if(pk){ setKept([+pk.dataset.id],false); renderRanks(); renderDecision(); toast('Modèle retiré de la sélection'); return; }
+  const b=e.target.closest('[data-fill],[data-clear],[data-keep],[data-unkeep]'); if(!b) return;
   const TARGET={golf:4,tiguan:4,vu:2};
-  if(b.dataset.fill){ const f=b.dataset.fill; const top=ranked(f,false).slice(0,TARGET[f]).map(x=>x.v.id); S.kept=S.kept.filter(id=>V[id].fam!==f).concat(top); toast(`${FAM[f]} : top ${TARGET[f]} retenu`); }
-  else if(b.dataset.clear){ const f=b.dataset.clear; S.kept=S.kept.filter(id=>V[id].fam!==f); toast(`${FAM[f]} : sélection vidée`); }
-  else if(b.dataset.keep){ const id=+b.dataset.keep; if(!S.kept.includes(id)) S.kept=S.kept.concat(id); }
-  else if(b.dataset.unkeep){ const id=+b.dataset.unkeep; S.kept=S.kept.filter(x=>x!==id); }
-  save(); renderRanks(); renderDecision();
+  if(b.dataset.fill){ const f=b.dataset.fill; const top=ranked(f,false).slice(0,TARGET[f]).map(x=>x.v.id); setKept(S.kept.filter(id=>V[id].fam===f&&!top.includes(id)),false); setKept(top,true); toast(`${FAM[f]} : top ${TARGET[f]} retenu`); }
+  else if(b.dataset.clear){ const f=b.dataset.clear; setKept(S.kept.filter(id=>V[id].fam===f),false); toast(`${FAM[f]} : sélection vidée`); }
+  else if(b.dataset.keep){ setKept([+b.dataset.keep],true); }
+  else if(b.dataset.unkeep){ setKept([+b.dataset.unkeep],false); }
+  renderRanks(); renderDecision();
 });
 
 document.getElementById('btn-reset-all').onclick=()=>{
   if(LV.on){ if(!LV.admin){ toast('Seul l\'animateur peut réinitialiser l\'atelier'); return; }
-    ask('Tout réinitialiser pour TOUS : votes des participants, notes corrigées et sélection ?',()=>{ LV.rows.forEach(d=>{ const id=d.id; dbWrite(id,()=>LV.db.collection('votes').doc(id).delete()); }); LV.rows=[]; S.ovr={}; S.kept=[]; S.ep={ess:2.004, elec:0.26}; save(); renderEP(); renderAll(); toast('Atelier réinitialisé'); }); return; }
+    ask('Tout réinitialiser pour TOUS : votes des participants, notes corrigées et sélection ?',()=>{ LV.rows.forEach(d=>{ const id=d.id; dbWrite(id,()=>LV.db.collection('votes').doc(id).delete()); }); LV.rows=[]; S.ovr={}; setKept(S.kept.slice(),false); S.ep={ess:2.004, elec:0.26}; save(); renderEP(); renderAll(); toast('Atelier réinitialisé'); }); return; }
   ask('Tout réinitialiser : participants, pondérations, notes corrigées et sélection ?',()=>{ S=defaults(); normalize(); save(); renderAll(); toast('Atelier réinitialisé'); }); };
 
 /* ---------- utilitaires ---------- */
@@ -845,13 +849,13 @@ async function sha256(t){ try{ const b=await crypto.subtle.digest('SHA-256',new 
 function myId(){ let id=null; try{ id=localStorage.getItem(KEY+'-me'); }catch(_){} if(!id){ id='p-'+Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4); try{ localStorage.setItem(KEY+'-me',id); }catch(_){} } return id; }
 function makeRelay(){
   const recs={}; // clé -> {ts, val|null}
-  const vsubs=[], ssubs=[]; let clients=[], up=0, readyCb=null;
+  const vsubs=[], ssubs=[], ksubs=[]; let clients=[], up=0, readyCb=null;
   const T=SYNC.topic;
   const emit=()=>{ const docs=Object.keys(recs).filter(k=>k.startsWith('v/')&&recs[k].val).map(k=>({id:k.slice(2), data:()=>recs[k].val}));
-    vsubs.forEach(f=>f({docs})); const st=recs['s']; ssubs.forEach(f=>f({exists:!!(st&&st.val), data:()=>st&&st.val})); };
+    vsubs.forEach(f=>f({docs})); const km={}; Object.keys(recs).filter(k=>k.startsWith('k/')).forEach(k=>{ km[k.slice(2)]=recs[k].val; }); ksubs.forEach(f=>f(km)); const st=recs['s']; ssubs.forEach(f=>f({exists:!!(st&&st.val), data:()=>st&&st.val})); };
   let emT=null; const emitSoon=()=>{ clearTimeout(emT); emT=setTimeout(emit,60); };
   function onMsg(topic,payload){
-    const k=topic.slice(T.length+1); if(!(k==='s'||/^v\/[\w-]{1,40}$/.test(k))) return;
+    const k=topic.slice(T.length+1); if(!(k==='s'||/^v\/[\w-]{1,40}$/.test(k)||/^k\/\d{1,4}$/.test(k))) return;
     let rec=null; const txt=payload&&payload.length?new TextDecoder().decode(payload):'';
     if(!txt){ rec={ts:Infinity,val:null}; if(recs[k]&&recs[k].val&&recs[k].pending) return; recs[k]=rec; emitSoon(); return; }
     try{ const o=JSON.parse(txt); if(!o||typeof o!=='object') return; rec={ts:+o._ts||0,val:o}; }catch(_){ return; }
@@ -884,6 +888,8 @@ function makeRelay(){
     connect, ready:f=>{ readyCb=f; },
     collection:c=>({ doc:id=>docRef('v/'+id), onSnapshot:f=>{ vsubs.push(f); } }),
     doc:p=>docRef('s'),
+    keep:(id,on)=>pub('k/'+id,{on:!!on, by:(rows(false).find(r=>r.mine)||{}).name||''}),
+    onKept:f=>{ ksubs.push(f); },
     online:()=>clients.some(c=>c._ok)
   };
 }
@@ -903,15 +909,21 @@ async function startLive(){
     renderAll();
     if(keepName){ const inp=document.getElementById('pname-'+keepName.row); if(inp){ inp.value=keepName.v; inp.focus({preventScroll:true}); try{ inp.setSelectionRange(keepName.ss,keepName.ss); }catch(_){} } }
   });
+  LV.keptBy={};
+  db.onKept(km=>{
+    const ids=Object.keys(km).filter(id=>km[id]&&km[id].on&&V[+id]).map(Number).sort((a,b)=>(km[a]._ts||0)-(km[b]._ts||0));
+    S.kept=ids; LV.keptBy=Object.fromEntries(ids.map(id=>[id,km[id].by||'']));
+    try{ localStorage.setItem(KEY,JSON.stringify(S)); }catch(e){}
+    renderRanks(); renderDecision();
+  });
   let firstState=true;
   db.doc('shared/state').onSnapshot(d=>{
     if(!d.exists){ if(LV.admin&&firstState) pushShared(); firstState=false; return; }
     firstState=false;
     const x=d.data()||{};
-    if(Array.isArray(x.kept)) S.kept=x.kept.filter(id=>V[id]);
     if(x.ovr&&typeof x.ovr==='object') S.ovr=x.ovr;
     if(x.ep&&x.ep.ess>=0&&x.ep.elec>=0) S.ep={ess:+x.ep.ess, elec:+x.ep.elec};
-    _shLast=JSON.stringify({kept:S.kept, ovr:S.ovr, ep:S.ep});
+    _shLast=JSON.stringify({ovr:S.ovr, ep:S.ep});
     try{ localStorage.setItem(KEY,JSON.stringify(S)); }catch(e){}
     if(!(document.activeElement&&document.activeElement.closest&&document.activeElement.closest('#ep'))) renderEP();
     if(!(document.activeElement&&document.activeElement.closest&&document.activeElement.closest('#ntable'))) renderNotes();
