@@ -342,7 +342,7 @@ footer p{margin:0;color:var(--mute);font-size:12px;max-width:80ch}
         <h2>Quelle importance pour chaque critère ?</h2>
         <p>Chaque participant note l'importance de chaque critère de 0 (sans importance) à 5 (essentiel). Les poids finaux sont la moyenne des notes, ramenée à 100 %. Un écart de 3 points ou plus entre participants signale un critère à discuter.</p>
       </div>
-      <div class="row"><button class="btn" id="btn-equal">Tout remettre à 3</button></div>
+      <div class="row"><button class="btn" id="btn-equal" title="Efface les notes de tous les participants">↺ Effacer tous les scores</button></div>
     </div>
     <div class="stack1">
       <div class="card">
@@ -515,10 +515,10 @@ const METHOD = {
 };
 
 /* ---------- état ---------- */
-const KEY='hg-flotte-2027-atelier-v3';
+const KEY='hg-flotte-2027-atelier-v4';
 const defaults = ()=>({
   people:['Participant 1','Participant 2','Participant 3','Participant 4','Participant 5','Participant 6','Participant 7'],
-  imp: CRIT.map(()=>[3,3,3,3,3,3,3]),
+  imp: CRIT.map(()=>[null,null,null,null,null,null,null]),
   ovr:{}, prix:{}, kept:[], ep:{ess:2.004, elec:0.26}, filt:{BEV:true,PHEV:true,HEV:true,MHEV:true,lom:false,eco:false}
 });
 let S = defaults();
@@ -526,7 +526,7 @@ try{ const raw=localStorage.getItem(KEY); if(raw){ const o=JSON.parse(raw); S=Ob
 function normalize(){
   if(!Array.isArray(S.people)||!S.people.length) S.people=defaults().people;
   if(!Array.isArray(S.imp)) S.imp=[];
-  CRIT.forEach((c,i)=>{ if(!Array.isArray(S.imp[i])) S.imp[i]=[]; while(S.imp[i].length<S.people.length) S.imp[i].push(3); S.imp[i].length=S.people.length; });
+  CRIT.forEach((c,i)=>{ if(!Array.isArray(S.imp[i])) S.imp[i]=[]; while(S.imp[i].length<S.people.length) S.imp[i].push(null); S.imp[i].length=S.people.length; });
   S.imp.length=CRIT.length; if(!S.prix) S.prix={}; if(!S.ep) S.ep={ess:2.004, elec:0.26};
 }
 normalize();
@@ -550,15 +550,16 @@ function canShared(){ if(LV.on&&!LV.admin){ toast('Seul l\'animateur peut modifi
 function note(v,k){ const o=S.ovr[v.id+'|'+k]; return (o!==undefined && o!==null && o!=='') ? Number(o) : preNote(v,k); }
 /* ---------- live (base partagée) ---------- */
 const LV={on:false, db:null, user:null, uid:null, admin:false, rows:[], ready:false, sharedSeen:false, status:'local', queue:{}};
-const DEF_IMP=()=>Object.fromEntries(CRIT.map(c=>[c.k,3]));
+const DEF_IMP=()=>({});
+const isN=x=>typeof x==='number'&&x>=0&&x<=5;
 function rows(includePlaceholder=true){
-  if(!LV.on) return S.people.map((p,j)=>({id:'L'+j, j, name:p, imp:CRIT.map((c,i)=>S.imp[i][j]), editable:true, mine:false, local:true}));
-  const out=LV.rows.map(d=>({id:d.id, name:d.name||'', imp:CRIT.map(c=>{ const x=d.imp&&d.imp[c.k]; return (typeof x==='number'&&x>=0&&x<=5)?x:3; }), editable:LV.admin||d.id===LV.uid, mine:d.id===LV.uid, createdAt:d.createdAt||0}));
+  if(!LV.on) return S.people.map((p,j)=>({id:'L'+j, j, name:p, imp:CRIT.map((c,i)=>isN(S.imp[i][j])?S.imp[i][j]:null), editable:true, mine:false, local:true}));
+  const out=LV.rows.map(d=>({id:d.id, name:d.name||'', imp:CRIT.map(c=>{ const x=d.imp&&d.imp[c.k]; return isN(x)?x:null; }), editable:LV.admin||d.id===LV.uid, mine:d.id===LV.uid, createdAt:d.createdAt||0}));
   out.sort((a,b)=>(a.createdAt-b.createdAt)||a.id.localeCompare(b.id));
-  if(includePlaceholder && LV.uid && !out.some(r=>r.mine)) out.unshift({id:LV.uid, name:'', imp:CRIT.map(()=>3), editable:true, mine:true, placeholder:true});
+  if(includePlaceholder && LV.uid && !out.some(r=>r.mine)) out.unshift({id:LV.uid, name:'', imp:CRIT.map(()=>null), editable:true, mine:true, placeholder:true});
   return out;
 }
-function cols(){ const r=rows(false); return CRIT.map((c,i)=>r.map(x=>x.imp[i])); }
+function cols(){ const r=rows(false); return CRIT.map((c,i)=>r.map(x=>x.imp[i]).filter(isN)); }
 function weights(){
   const avgs = cols().map(r=>r.length? r.reduce((a,b)=>a+b,0)/r.length : 3);
   const tot = avgs.reduce((a,b)=>a+b,0);
@@ -637,7 +638,7 @@ document.getElementById('wtable').addEventListener('click',e=>{
     if(LV.on){ if(!LV.admin) return; const id='m-'+Math.random().toString(36).slice(2,10); const nm='Participant '+(rows(false).length+1);
       LV.rows.push({id,name:nm,imp:DEF_IMP(),createdAt:Date.now()}); renderAll();
       dbWrite(id,()=>LV.db.collection('votes').doc(id).set({name:nm, imp:DEF_IMP(), createdAt:Date.now(), updatedAt:Date.now(), manual:true})); toast('Participant ajouté (partagé)'); return; }
-    S.people.push('Participant '+(S.people.length+1)); S.imp.forEach(r=>r.push(3)); save(); renderAll(); const inp=document.getElementById('pname-'+(S.people.length-1)); if(inp){ inp.focus({preventScroll:true}); inp.select(); } toast(S.people.length+' participants'); return; }
+    S.people.push('Participant '+(S.people.length+1)); S.imp.forEach(r=>r.push(null)); save(); renderAll(); const inp=document.getElementById('pname-'+(S.people.length-1)); if(inp){ inp.focus({preventScroll:true}); inp.select(); } toast(S.people.length+' participants'); return; }
   const d=e.target.closest('button[data-del]');
   if(d){ const r=window._rows[+d.dataset.del]; if(!r) return;
     ask(`Retirer « ${r.name||'ce participant'} » et ses notes ?`,()=>{
@@ -659,9 +660,12 @@ document.getElementById('wtable').addEventListener('change',e=>{
   const nm=t.value.trim().slice(0,60); liveSetName(r,nm); toast('Nom enregistré');
 });
 document.getElementById('btn-equal').onclick=()=>{
-  if(LV.on){ if(!LV.admin){ toast('Seul l\'animateur peut remettre toutes les notes à 3'); return; }
-    ask('Remettre toutes les notes de tous les participants à 3 ?',()=>{ LV.rows.forEach(d=>{ d.imp=DEF_IMP(); const id=d.id; dbWrite(id,()=>LV.db.collection('votes').doc(id).update({imp:DEF_IMP(), updatedAt:Date.now()})); }); renderAll(); toast('Notes remises à 3'); }); return; }
-  S.imp=CRIT.map(()=>S.people.map(()=>3)); save(); renderAll(); toast('Notes d\'importance remises à 3'); };
+  const n=rows(false).length;
+  ask(`Effacer les notes d'importance de tous les participants (${n}) pour repartir de zéro ? Les noms sont conservés ; ce n'est pas annulable.`,()=>{
+    if(LV.on){ LV.rows.forEach(d=>{ d.imp={}; const id=d.id; dbWrite(id,()=>LV.db.collection('votes').doc(id).update({imp:{}, updatedAt:Date.now()})); }); }
+    else { S.imp=CRIT.map(()=>S.people.map(()=>null)); save(); }
+    renderAll(); toast('Scores effacés : chacun peut noter à nouveau');
+  }); };
 
 /* ---------- vue 2 : classement ---------- */
 function renderStrip(){
