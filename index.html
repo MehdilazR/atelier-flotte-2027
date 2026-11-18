@@ -342,7 +342,7 @@ footer p{margin:0;color:var(--mute);font-size:12px;max-width:80ch}
         <h2>Quelle importance pour chaque critère ?</h2>
         <p>Chaque participant note l'importance de chaque critère de 0 (sans importance) à 5 (essentiel). Les poids finaux sont la moyenne des notes, ramenée à 100 %. Un écart de 3 points ou plus entre participants signale un critère à discuter.</p>
       </div>
-      <div class="row"><button class="btn" id="btn-equal" title="Efface les notes de tous les participants">↺ Effacer tous les scores</button></div>
+      <div class="row"><button class="btn" id="btn-equal" title="Supprime tous les participants et leurs notes">↺ Repartir de zéro</button></div>
     </div>
     <div class="stack1">
       <div class="card">
@@ -661,10 +661,10 @@ document.getElementById('wtable').addEventListener('change',e=>{
 });
 document.getElementById('btn-equal').onclick=()=>{
   const n=rows(false).length;
-  ask(`Effacer les notes d'importance de tous les participants (${n}) pour repartir de zéro ? Les noms sont conservés ; ce n'est pas annulable.`,()=>{
-    if(LV.on){ LV.rows.forEach(d=>{ d.imp={}; const id=d.id; dbWrite(id,()=>LV.db.collection('votes').doc(id).update({imp:{}, updatedAt:Date.now()})); }); }
-    else { S.imp=CRIT.map(()=>S.people.map(()=>null)); save(); }
-    renderAll(); toast('Scores effacés : chacun peut noter à nouveau');
+  ask(`Repartir de zéro : supprimer les ${n} participant${n>1?'s':''} et toutes leurs notes, pour tout le monde ? Ce n'est pas annulable.`,()=>{
+    if(LV.on){ const ids=LV.rows.map(d=>d.id); LV.rows=[]; ids.forEach(id=>dbWrite(id,()=>LV.db.collection('votes').doc(id).delete())); }
+    else { const d=defaults(); S.people=d.people; S.imp=d.imp; save(); }
+    renderAll(); toast('Participants et scores supprimés : chacun peut s\'inscrire à nouveau');
   }); };
 
 /* ---------- vue 2 : classement ---------- */
