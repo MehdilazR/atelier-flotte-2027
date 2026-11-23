@@ -583,7 +583,7 @@ nav.steps button.cmp-tab[aria-selected="true"] .n{background:#fff;color:#5B3FA0}
  html body.print-compare>#cmp-report{display:block!important}
  #cmp-report{font-size:10px;color:#1D1B1C;line-height:1.3}
  #cmp-report h2,#cmp-report h4{margin:0}
- .cr-page{height:193mm;display:flex;flex-direction:column;break-after:page;page-break-after:always;overflow:hidden}
+ .cr-page{height:280mm;display:flex;flex-direction:column;break-after:page;page-break-after:always;overflow:hidden}
  .cr-page:last-child{break-after:auto;page-break-after:auto}
  .cr-top{display:flex;align-items:center;gap:14px;background:#1D1B1C;color:#fff;border-radius:9px;padding:9px 14px}
  .cr-brand{display:flex;gap:10px;align-items:center}.cr-brand img{height:22px;width:auto}
@@ -598,10 +598,10 @@ nav.steps button.cmp-tab[aria-selected="true"] .n{background:#fff;color:#5B3FA0}
  .cr-w{display:flex;gap:9px;flex-wrap:wrap;font-size:8.5px;color:#4A4647}.cr-w b{font-size:8.5px;text-transform:uppercase;letter-spacing:.05em;color:#8A8486}
  .cr-w i{display:inline-block;width:7px;height:7px;border-radius:2px;margin-right:3px;vertical-align:0}
  .cr-verdict{margin:8px 0 4px;font-size:12px;font-weight:700;background:#F6F3F4;border-radius:7px;padding:6px 10px}
- .cr-body{display:grid;grid-template-columns:330px minmax(0,1fr);gap:16px;align-items:start;margin-top:4px}
- .cr-radar svg{width:330px;height:auto;display:block}
- .cr-page.big .cr-body{grid-template-columns:420px minmax(0,1fr);margin-top:10px}
- .cr-page.big .cr-radar svg{width:420px}
+ .cr-body{display:grid;grid-template-columns:270px minmax(0,1fr);gap:12px;align-items:start;margin-top:4px}
+ .cr-radar svg{width:270px;height:auto;display:block}
+ .cr-page.big .cr-body{grid-template-columns:1fr;margin-top:8px}
+ .cr-page.big .cr-radar svg{width:430px;margin:0 auto}
  .cr-page.big .cr-t td{padding:7px 6px}
  .cr-page.big .cr-crit{margin-top:14px}
  .cr-t{width:100%;border-collapse:collapse;font-size:9.5px}
@@ -1473,7 +1473,7 @@ function renderCmpReport(){
     const present=D_.filter(x=>x.prof).sort((a,b)=>b.prof.score-a.prof.score), mx=Math.max(1,...present.map(x=>x.prof.score));
     const rank=`<table class="cr-t cr-rk"><thead><tr><th>#</th><th>Sélection</th><th>Référence (${modeL})</th><th>Meilleur rang</th><th>Score</th></tr></thead><tbody>${present.map((x,i)=>`<tr><td class="pos">${i+1}</td><td class="who"><i style="background:${x.c}"></i><b>${esc(x.n)}</b></td><td>${esc(x.prof.label)}</td><td class="n">${x.list[0].r}ᵉ / ${rk.length}</td><td class="sc"><div class="bar"><i style="width:${(x.prof.score/mx*100).toFixed(1)}%;background:${x.c}"></i></div><b>${Math.round(x.prof.score)}</b></td></tr>`).join('')}${D_.filter(x=>!x.prof).map(x=>`<tr class="none"><td class="pos">–</td><td class="who"><i style="background:${x.c}"></i><b>${esc(x.n)}</b></td><td colspan="3">aucun modèle dans cette catégorie</td></tr>`).join('')}</tbody></table>`;
     const MAXL=8;
-    const lists=`<div class="cr-lists" style="grid-template-columns:repeat(${Math.max(1,D_.length)},minmax(0,1fr))">${D_.map(x=>`<div class="cr-l"><h4 style="color:${x.c}"><i style="background:${x.c}"></i>${esc(x.n)} · ${x.list.length}</h4>${x.list.slice(0,MAXL).map(m=>`<div class="cr-li"><span class="r">${m.r}ᵉ</span><span class="nm">${esc(m.v.brand)} ${esc(m.v.model)}${S.kept.includes(m.v.id)?' <em>★</em>':''}<small>${ENERGY_LABEL[m.v.energy]}</small></span><b>${Math.round(m.s)}</b></div>`).join('')}${x.list.length>MAXL?`<div class="cr-more">+ ${x.list.length-MAXL} autre${x.list.length-MAXL>1?'s':''} (scores ≤ ${Math.round(x.list[MAXL].s)})</div>`:''}${x.list.length?'':'<div class="cr-more">Aucun modèle</div>'}</div>`).join('')}</div>`;
+    const lists=`<div class="cr-lists" style="grid-template-columns:repeat(${Math.min(3,Math.max(1,D_.length))},minmax(0,1fr))">${D_.map(x=>`<div class="cr-l"><h4 style="color:${x.c}"><i style="background:${x.c}"></i>${esc(x.n)} · ${x.list.length}</h4>${x.list.slice(0,MAXL).map(m=>`<div class="cr-li"><span class="r">${m.r}ᵉ</span><span class="nm">${esc(m.v.brand)} ${esc(m.v.model)}${S.kept.includes(m.v.id)?' <em>★</em>':''}<small>${ENERGY_LABEL[m.v.energy]}</small></span><b>${Math.round(m.s)}</b></div>`).join('')}${x.list.length>MAXL?`<div class="cr-more">+ ${x.list.length-MAXL} autre${x.list.length-MAXL>1?'s':''} (scores ≤ ${Math.round(x.list[MAXL].s)})</div>`:''}${x.list.length?'':'<div class="cr-more">Aucun modèle</div>'}</div>`).join('')}</div>`;
     h+=page(k+2,FAM[f],`${rk.length} modèles dans la catégorie · comparaison sur : ${modeL} · ★ = retenu en atelier`,
       `<div class="cr-verdict">${verdict(present,'est présent')}</div>
        <div class="cr-body"><div class="cr-radar">${radarSVG(D_.map(x=>({prof:x.prof,c:x.c,n:x.n})),w)}</div><div>${rank}${critRow(present)}</div></div>${lists}`);
@@ -1483,7 +1483,7 @@ function renderCmpReport(){
 document.getElementById('btn-cmp-pdf').addEventListener('click',()=>{
   renderCmpReport();
   document.body.classList.add('print-compare');
-  let ps=document.getElementById('cmp-page-style'); if(!ps){ ps=document.createElement('style'); ps.id='cmp-page-style'; document.head.appendChild(ps); } ps.textContent='@page{size:A4 landscape;margin:8mm}';
+  let ps=document.getElementById('cmp-page-style'); if(!ps){ ps=document.createElement('style'); ps.id='cmp-page-style'; document.head.appendChild(ps); } ps.textContent='@page{size:A4 portrait;margin:8mm}';
   const done=()=>{ document.body.classList.remove('print-compare'); const q=document.getElementById('cmp-page-style'); if(q) q.textContent=''; window.removeEventListener('afterprint',done); };
   window.addEventListener('afterprint',done);
   toast('Choisissez « Enregistrer au format PDF » comme imprimante');
@@ -1596,7 +1596,7 @@ async function startLive(){
 renderMethod(); renderEP(); renderAll(); startLive();
 /* Nouvelle version publiée ? (le cache des téléphones garde la page ~10 min) */
 (function(){
-  const BUILD='b1795445304'; if(BUILD.startsWith('__')||location.protocol==='file:') return;
+  const BUILD='b1795446221'; if(BUILD.startsWith('__')||location.protocol==='file:') return;
   let shown=false;
   async function check(){
     if(shown) return;
